@@ -14,6 +14,8 @@ import javafx.scene.control.TextArea;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
 import javafx.stage.Stage;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 public class AdminControl {
 
@@ -37,6 +39,16 @@ public class AdminControl {
     // Handles user/group being added to TreeView
     private TreeView<String> showTreeView;
     private TreeItem<String> rootItem;
+
+    // For CreationTime
+    private static Map<String, Long> userCreationTimes = new HashMap<>();
+    private static Map<String, Long> groupCreationTimes = new HashMap<>();
+
+    private static Map<String, Long> lastUpdateTimes = new HashMap<>();
+
+    public void updateLastUpdateTime(String userName, long updateTime) {
+        lastUpdateTimes.put(userName, updateTime);
+    }
     
     @FXML
 
@@ -75,6 +87,9 @@ public class AdminControl {
     void btnAddGroup(ActionEvent event) {
         String groupName = getGroupID.getText().trim();
         if (!groupName.isEmpty()) {
+            long groupCreationTime = System.currentTimeMillis();
+            groupCreationTimes.put(groupName, groupCreationTime);
+
             TreeItem<String> groupItem = new TreeItem<>("🗐" + groupName);
             rootItem.getChildren().add(groupItem);
             getGroupID.clear();
@@ -92,6 +107,9 @@ public class AdminControl {
         if (!userName.isEmpty()) {
             // Check if the user already exists
             if (!allUsers.contains(userName)) {
+                long userCreationTime = System.currentTimeMillis();
+                userCreationTimes.put(userName, userCreationTime);
+
                 TreeItem<String> userItem = new TreeItem<>("🗏" + userName);
                 TreeItem<String> selectedItem = showTreeView.getSelectionModel().getSelectedItem();
     
@@ -225,4 +243,93 @@ public class AdminControl {
             showPopup("Error", "Please select a user from the tree view.");
         }
     }
+
+    @FXML
+    void btnValidate(ActionEvent event) {
+        // Check for duplicate IDs
+        for (int i = 0; i < allUsers.size(); i++) {
+            for (int j = i + 1; j < allUsers.size(); j++) {
+                if (allUsers.get(i).equals(allUsers.get(j))) {
+                    showPopup("Error", "All user IDs must be unique.");
+                    return;
+                }
+            }
+        }
+
+        // Check for IDs containing spaces
+        for (String userID : allUsers) {
+            if (userID.contains(" ")) {
+                showPopup("Error", "User IDs cannot contain spaces.");
+                return;
+            }
+        }
+
+        for (String userID : allUsers) {
+            lastUpdateTimes.put(userID, System.currentTimeMillis());
+        }
+
+        // If both checks pass, show success popup
+        showPopup("Validation", "All users validated!");
+    }
+
+    @FXML
+    void btnUserCreationTime(ActionEvent event) {
+        TreeItem<String> selectedItem = showTreeView.getSelectionModel().getSelectedItem();
+
+        if (selectedItem != null && selectedItem.getValue().startsWith("🗏")) {
+            String userName = selectedItem.getValue().replaceAll("[🗐🗏]", "").trim();
+            long creationTime = userCreationTimes.getOrDefault(userName, 0L);
+
+            // Show creation time in a popup
+            showPopup("User Creation Time", "User '" + userName + "' was created at: " + formatDateTime(creationTime));
+        } else {
+            showPopup("Error", "Please select a user from the tree view.");
+        }
+    }
+
+    @FXML
+    void btnGroupCreationTime(ActionEvent event) {
+        TreeItem<String> selectedItem = showTreeView.getSelectionModel().getSelectedItem();
+
+        if (selectedItem != null && selectedItem.getValue().startsWith("🗐")) {
+            String groupName = selectedItem.getValue().replaceAll("[🗐🗏]", "").trim();
+            long creationTime = groupCreationTimes.getOrDefault(groupName, 0L);
+
+            // Show creation time in a popup
+            showPopup("Group Creation Time", "Group '" + groupName + "' was created at: " + formatDateTime(creationTime));
+        } else {
+            showPopup("Error", "Please select a group from the tree view.");
+        }
+    }
+
+    private String formatDateTime(long timestamp) {
+        LocalDateTime dateTime = LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(timestamp), java.time.ZoneId.systemDefault());
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+        return dateTime.format(formatter);
+    }
+
+    @FXML
+void btnLastUpdatedUser(ActionEvent event) {
+    String lastUpdatedUser = findLastUpdatedUser();
+    
+    if (lastUpdatedUser != null) {
+        showPopup("Last Updated User", "User with the latest update: " + lastUpdatedUser);
+    } else {
+        showPopup("Error", "No users available.");
+    }
+}
+
+private String findLastUpdatedUser() {
+    long latestUpdateTime = Long.MIN_VALUE;
+    String lastUpdatedUser = null;
+
+    for (Map.Entry<String, Long> entry : lastUpdateTimes.entrySet()) {
+        if (entry.getValue() > latestUpdateTime) {
+            latestUpdateTime = entry.getValue();
+            lastUpdatedUser = entry.getKey();
+        }
+    }
+
+    return lastUpdatedUser;
+}
 }

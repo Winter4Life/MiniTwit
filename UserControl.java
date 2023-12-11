@@ -30,6 +30,7 @@ public class UserControl implements TweetObserver,IDVisitor {
     public static Map<String, UserState> getUserStates() {
         return userStates;
     }
+
     public void visit(String visitorID, String formattedMessage) {
         UserState userState = userStates.get(visitorID);
         if (userState != null) {
@@ -62,10 +63,8 @@ public class UserControl implements TweetObserver,IDVisitor {
                 currentFollow.getItems().add(followerID);
                 saveUserState();
 
-                UserState userState = userStates.get(userName);
-                if (userState != null) {
-                    userState.accept(this, "You started following " + followerID);
-                }
+                // Update last update time when a user follows someone
+                AdminControl.getInstance().updateLastUpdateTime(userName, System.currentTimeMillis());
             } else {
                 showPopup("Error", "Cannot follow yourself.");
             }
@@ -74,7 +73,8 @@ public class UserControl implements TweetObserver,IDVisitor {
         }
         AdminControl.registerObserver(followerID, this);
         userID.clear();
-}
+    }
+
 
     // Helper Method to display follow in newsfeed
     private void showPopup(String title, String contentText) {
@@ -91,16 +91,19 @@ public class UserControl implements TweetObserver,IDVisitor {
         if (!message.isEmpty()) {
             String formattedMessage = userName + ": " + message;
             newsFeed.getItems().add(formattedMessage);
-    
+
             totalMessages++;
-    
+
             informFollowersAboutTweet(userName, formattedMessage);
             tweet.clear();
-    
+
             AdminControl.notifyObservers(userName, formattedMessage);
             saveUserState();
+
+            AdminControl.getInstance().updateLastUpdateTime(userName, System.currentTimeMillis());
         }
     }
+
 
     private void informFollowersAboutTweet(String userName, String formattedMessage) {
         for (Map.Entry<String, UserState> entry : userStates.entrySet()) {
